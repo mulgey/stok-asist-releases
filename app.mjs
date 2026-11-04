@@ -42,11 +42,13 @@ function confirmAction(name,values,title,summary){const reason=el('textarea',{re
 async function checkHealth(){
  if(preview){notice('Salt okunur önizleme: hizmet kontrolü gönderilmedi.');return;}
  const result=await request('admin-health',{});
- if(result.key_id!=='test-850333ab-a159-44c2-99c9-39baa91e40bf')throw Error('İmza anahtarı güvenilir test anahtarıyla eşleşmedi.');
- const key=await crypto.subtle.importKey('raw',Uint8Array.from(atob('thrDfoejnyNykYpK55fSuQ/3eDP/0YG38PgnB+tQxEI='),c=>c.charCodeAt(0)),{name:'Ed25519'},false,['verify']);
+ const trustedKeys={"production-2e85a957-f720-49b2-b3d7-056499aa79a9": "vUiL6qEduGJxxjn3BOQ1EqJXKt4txMbjRrHmbUvl7iE="};
+ const encodedKey=trustedKeys[result.key_id];
+ if(!Object.hasOwn(trustedKeys,result.key_id))throw Error('İmza anahtarı güvenilir üretim anahtarlarıyla eşleşmedi.');
+ const key=await crypto.subtle.importKey('raw',Uint8Array.from(atob(encodedKey),c=>c.charCodeAt(0)),{name:'Ed25519'},false,['verify']);
  const valid=await crypto.subtle.verify('Ed25519',key,Uint8Array.from(atob(result.signature),c=>c.charCodeAt(0)),new TextEncoder().encode('StokAsist-Health-v1\0'+result.payload));
- if(!valid||JSON.parse(result.payload).purpose!=='license-service-check')throw Error('Hizmet yanıtının imzası doğrulanamadı.');
- state.notice='API, veritabanı, yönetici yetkisi ve imzalı test yanıtı doğrulandı. Bu kontrol Supabase duraklamama garantisi değildir.';state.error=false;
+ if(!valid||(JSON.parse(result.payload).purpose!=='license-service-check'||JSON.parse(result.payload).environment!=='production'))throw Error('Hizmet yanıtının imzası doğrulanamadı.');
+ state.notice='API, veritabanı, yönetici yetkisi ve imzalı üretim yanıtı doğrulandı. Bu kontrol Supabase duraklamama garantisi değildir.';state.error=false;
 }
 function renderHeader(){return el('header',{class:'top'},el('div',{class:'brand'},el('div',{class:'logo'},'S'),el('div',{},el('h1',{},'Stok Asist'),el('p',{class:'muted'},'Lisans Yönetimi')),el('span',{class:'tag'},'Üretim')),
  state.token?el('div',{class:'row'},el('span',{class:'muted'},state.email||'Yönetici'),button('Hizmeti Kontrol Et',()=>action(checkHealth)),button('Yenile',()=>action(refresh)),button('Çıkış Yap',()=>action(async()=>{if(!preview)await request('admin-logout',{});state.token='';state.data=null;state.selected=null;state.offline=null;state.notice='Oturum kapatıldı.';}))):null);}
