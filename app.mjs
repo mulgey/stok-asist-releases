@@ -4,13 +4,13 @@ const API='https://urrzxpepdwtkodfyjmbr.supabase.co/functions/v1/license-api';
 const app=document.querySelector('#app');
 const preview=['localhost','127.0.0.1'].includes(location.hostname)&&new URL(location.href).searchParams.get('preview')==='1';
 const fragment=new URLSearchParams(location.hash.slice(1));
-const linkKind=['admin','recover','info'].find(name=>fragment.has(name));
+const linkKind=['admin','recover','info','profile'].find(name=>fragment.has(name));
 let linkToken=linkKind?fragment.get(linkKind):null;
 if(location.hash)history.replaceState(null,'',location.pathname+location.search);
 const state={offline:null,token:'',email:'',tab:'requests',selected:null,data:null,detail:null,busy:false,notice:'',error:false};
 const pending=new Map();
-const labels={pending:'Bekliyor',approved:'Onaylandı',rejected:'Reddedildi',needs_info:'Ek bilgi bekleniyor',cancelled:'İptal',active:'Aktif',expired:'Süresi doldu',revoked:'İptal edildi',sent:'Gönderildi',delivered:'Teslim edildi',failed:'Gönderilemedi',sending:'Gönderiliyor',pilot:'Ücretsiz Pilot',paid:'Ücretli',sponsored:'Sponsorlu'};
-const errors={unauthorized:'Oturumunuzu yeniden açın.',forbidden:'Bu işlem için yönetici yetkiniz bulunmuyor.',invalid_token:'Bağlantı kullanılmış veya süresi dolmuş. Yeni bağlantı isteyin.',invalid_request:'Alanları kontrol edin.',state_conflict:'Kayıt değişti. Listeyi yenileyin.',operation_conflict:'İşlem bilgileri değişti. Listeyi yenileyin.',email_expired:'Gönderim süresi doldu. Güvenli anahtar kurtarma akışını kullanın.',mail_not_configured:'E-posta hizmeti henüz hazır değil.',rate_limited:'Çok sık deneme yapıldı. Biraz bekleyin.',service_unavailable:'Hizmete ulaşılamadı. Tekrar deneyebilirsiniz.',email_conflict:'Bu adres başka bir sorumlu kaydına bağlı. Otomatik birleştirme yapılmadı.'};
+const labels={pending_email:'E-posta doğrulaması bekliyor',withdrawn:'Geri çekildi',needs_review:'Yeniden değerlendirme gerekli',pending:'Bekliyor',approved:'Onaylandı',rejected:'Reddedildi',needs_info:'Ek bilgi bekleniyor',cancelled:'İptal',active:'Aktif',expired:'Süresi doldu',revoked:'İptal edildi',sent:'Gönderildi',delivered:'Teslim edildi',failed:'Gönderilemedi',sending:'Gönderiliyor',pilot:'Ücretsiz Pilot',paid:'Ücretli',sponsored:'Sponsorlu'};
+const errors={email_unverified:'Yeni e-posta adresi doğrulanmalı.',profile_pending:'Bekleyen bir profil talebi var.',unauthorized:'Oturumunuzu yeniden açın.',forbidden:'Bu işlem için yönetici yetkiniz bulunmuyor.',invalid_token:'Bağlantı kullanılmış veya süresi dolmuş. Yeni bağlantı isteyin.',invalid_request:'Alanları kontrol edin.',state_conflict:'Kayıt değişti. Listeyi yenileyin.',operation_conflict:'İşlem bilgileri değişti. Listeyi yenileyin.',email_expired:'Gönderim süresi doldu. Güvenli anahtar kurtarma akışını kullanın.',mail_not_configured:'E-posta hizmeti henüz hazır değil.',rate_limited:'Çok sık deneme yapıldı. Biraz bekleyin.',service_unavailable:'Hizmete ulaşılamadı. Tekrar deneyebilirsiniz.',email_conflict:'Bu adres başka bir sorumlu kaydına bağlı. Otomatik birleştirme yapılmadı.'};
 function el(tag,attrs={},...children){const node=document.createElement(tag);for(const[key,value]of Object.entries(attrs)){
  if(key.startsWith('on'))node.addEventListener(key.slice(2).toLowerCase(),value);else if(key==='class')node.className=value;
  else if(key==='value')node.value=value;else if(typeof value==='boolean'){if(value)node.setAttribute(key,'');}else node.setAttribute(key,value);
@@ -25,7 +25,7 @@ function notice(text,error=false){state.notice=text;state.error=error;render();}
 async function request(route,data){if(preview)throw Error('Salt okunur önizleme sunucuya bağlanmaz.');const headers={'Content-Type':'application/json'};if(state.token)headers.Authorization='Bearer '+state.token;
  const response=await fetch(API+'/'+route,{method:data===undefined?'GET':'POST',headers,...(data===undefined?{}:{body:JSON.stringify(data)}),signal:AbortSignal.timeout(20000)});
  const value=await response.json();if(!response.ok){if(response.status===401&&state.token){state.token='';state.data=null;state.offline=null;}throw Error(errors[value.error]??'İşlem tamamlanamadı.');}return value;}
-async function refresh(){if(preview){render();return;}state.data=await request('admin',{action:'list',input:{}});if(state.selected)state.selected=(state.data[state.tab]??[]).find(row=>row.id===state.selected.id)??null;if(state.selected){const id=state.tab==='licenses'?state.selected.id:state.selected.license_id;if(id)state.detail=await request('admin',{action:'detail',input:{license_id:id}});}render();}
+async function refresh(){if(preview){render();return;}state.data=await request('admin',{action:'list',input:{}});state.data.profile_changes=(await request('admin-profile',{action:'list',input:{}})).changes;if(state.selected)state.selected=(state.data[state.tab]??[]).find(row=>row.id===state.selected.id)??null;if(state.selected){const id=state.tab==='licenses'?state.selected.id:state.selected.license_id;if(id)state.detail=await request('admin',{action:'detail',input:{license_id:id}});}render();}
 async function action(fn){if(state.busy)return;state.busy=true;render();try{await fn();}catch(error){state.notice=error.name==='TimeoutError'?'Yanıt alınamadı. İşlem kaydedilmiş olabilir; aynı işlemle tekrar deneyin.':error.message;state.error=true;}finally{state.busy=false;render();}}
 async function operate(name,values){if(preview){notice('Salt okunur önizleme: sunucuya işlem gönderilmedi.');return;}
  const key=JSON.stringify([name,values]);const operation=pending.get(key)??crypto.randomUUID();pending.set(key,operation);
@@ -55,7 +55,7 @@ function renderHeader(){return el('header',{class:'top'},el('div',{class:'brand'
 function renderLogin(){const address=input('email','',{required:true,autocomplete:'email',placeholder:'Yönetici e-posta adresiniz'});
  const form=el('form',{class:'stack'},el('h2',{},'Yönetici Girişi'),el('p',{class:'muted'},'İzin verilen adresinize tek kullanımlık giriş bağlantısı gönderilir.'),field('E-posta adresi',address),el('button',{type:'submit',class:'primary',disabled:state.busy},'Giriş Bağlantısı Gönder'));
  form.addEventListener('submit',event=>{event.preventDefault();action(async()=>{await request('admin-login',{email:address.value});state.notice='Adresiniz yetkiliyse giriş bağlantısı e-postanıza gönderilir. Gelen kutunuzu ve istenmeyen postayı kontrol edin.';state.error=false;});});return el('div',{class:'login'},card(form,el('p',{class:'muted'},'Bu panel kurumun stok veya rapor içeriklerini görüntülemez.')));}
-function renderLink(){const title=linkKind==='admin'?'Yönetici girişini tamamlayın':linkKind==='recover'?'Yeni ürün anahtarı isteyin':'Başvurunuzu tamamlayın';const message=el('textarea',{required:true,maxlength:2000});
+function renderLink(){if(linkKind==='profile')return card(el('h2',{},'Yeni e-posta adresinizi doğrulayın'),el('p',{},'Doğrulama sonrasında profil değişikliği yönetici onayına sunulur.'),button('E-posta Adresini Doğrula',()=>action(async()=>{await request('confirm-profile-email',{token:linkToken});linkToken=null;state.notice='E-posta doğrulandı. Değişiklik yönetici onayını bekliyor.';})));const title=linkKind==='admin'?'Yönetici girişini tamamlayın':linkKind==='recover'?'Yeni ürün anahtarı isteyin':'Başvurunuzu tamamlayın';const message=el('textarea',{required:true,maxlength:2000});
  return el('div',{class:'login'},card(el('h2',{},title),el('p',{class:'muted'},'Bağlantı yalnız bir kez kullanılabilir. İşlem düğmeye bastığınızda gerçekleşir.'),
  linkKind==='info'?field('İstenen ek bilgiler',message):null,button(linkKind==='admin'?'Girişi Tamamla':linkKind==='recover'?'Yeni Anahtar Gönder':'Bilgileri Gönder',()=>action(async()=>{
  if(!linkToken)throw Error(errors.invalid_token);
@@ -145,12 +145,39 @@ function licenseDetail(row){const detail=state.detail??{devices:[],emails:[]};re
  el('h3',{},'Cihazlar'),el('div',{class:'list'},...(detail.devices.length?detail.devices.map(d=>el('div',{class:'device stack'},el('strong',{},d.device_name||'Adlandırılmamış cihaz'),el('p',{class:'muted'},d.short_id+' · '+d.os_name+' · '+d.app_version),el('p',{class:'muted'},'Son doğrulama: '+fmt(d.last_checked_at)),el('div',{class:'row'},pill(d.active?'active':'revoked'),d.active?button('Cihazı Pasifleştir',()=>confirmAction('deactivate_device',{activation_id:d.id},'Cihazı Pasifleştir',`${d.device_name||d.short_id}: çevrimdışı cihazın mevcut izni bitene kadar çalışabileceğini unutmayın.`),'small'):null))):[el('p',{class:'muted'},'Etkinleştirilmiş cihaz yok.')])),
  el('h3',{},'E-posta Geçmişi'),el('div',{class:'list'},...(detail.emails.length?detail.emails.map(mail=>el('div',{class:'mail'},el('div',{class:'row'},pill(mail.status),el('span',{class:'muted'},fmt(mail.created_at)),['failed','pending','sent'].includes(mail.status)?button('Yeniden Gönder',()=>action(()=>operate('retry_email',{email_job_id:mail.id})),'small'):null))):[el('p',{class:'muted'},'Gönderim kaydı yok.')])));
 }
+const profileLabels={institution_name:'Kurum',city:'Şehir',beds:'Yatak sayısı',first_name:'İsim',last_name:'Soyisim',role_name:'Görev',email:'E-posta'};
+async function decideProfile(actionName,row,reason=''){
+ const key=JSON.stringify(['profile',actionName,row.id,reason]);
+ const operation=pending.get(key)??crypto.randomUUID();pending.set(key,operation);
+ const result=await request('admin-profile',{action:actionName,input:{operation_id:operation,change_id:row.id,...(reason?{reason}:{})}});
+ pending.delete(key);
+ state.notice=result.status==='needs_review'?'Onaylı bilgiler değişmiş. Kullanıcı güncel bilgilerle yeni talep oluşturmalı.':'Profil talebi kaydedildi.';
+ if(result.mail?.status==='failed')state.notice+=' Karar kaydedildi; bilgilendirme e-postası gönderilemedi. Lisansın gönderim geçmişinden yeniden deneyebilirsiniz.';
+ state.error=result.mail?.status==='failed';await refresh();
+}
+function profileChangeDetail(row){
+ return card(el('h2',{},'Profil Değişiklik Talebi'),pill(row.status),
+  el('p',{},row.original.institution_name+' · '+row.original.email),
+  el('p',{class:'muted'},'Talep cihazı: '+row.activation_id+' · '+fmt(row.created_at)),
+  el('div',{class:'list'},...Object.entries(profileLabels).filter(([key])=>row.original[key]!==row.proposed[key]).map(([key,label])=>
+   el('div',{class:'stack'},el('strong',{},label),el('span',{},'Mevcut: '+(row.original[key]||'Boş')),el('span',{},'Talep: '+(row.proposed[key]||'Boş'))))),
+  el('p',{class:'muted'},row.explanation||'Açıklama eklenmedi.'),row.reason?el('p',{},row.reason):null,
+  el('p',{class:'muted'},'Kurum kimliği korunarak düzeltme yapılır. Başka hastaneye geçiş için talebi reddedip kurum taşıma akışını kullanın.'),
+  ['pending','pending_email'].includes(row.status)?el('div',{class:'row'},
+   row.status==='pending'?button('Talebi Onayla',()=>modal('Profil Değişikliğini Onayla',[
+    el('p',{},'Yukarıdaki değişiklikler onaylı profile uygulanacak. Kurum alanları aynı kurum kimliğine bağlı diğer lisanslara da yansır.')],
+    'Onayla',()=>decideProfile('approve',row))):el('p',{},'Yeni e-posta adresinin doğrulanması bekleniyor.'),
+   button('Talebi Reddet',()=>{const reason=el('textarea',{required:true,maxlength:2000});modal('Profil Talebini Reddet',[field('Gerekçe',reason)],'Reddet',()=>decideProfile('reject',row,reason.value));},'danger')):null);
+}
+function profileChangeList(rows){return el('div',{class:'list'},...rows.map(row=>el('div',{class:'device'},
+ el('strong',{},row.original.institution_name),el('p',{},row.original.email),pill(row.status),
+ button('İncele',()=>{state.selected=row;render();},'small'))));}
 function renderDashboard(){const data=state.data??{requests:[],licenses:[]};const rows=data[state.tab]??[];
- return el('div',{},el('nav',{class:'row tabs','aria-label':'Yönetim bölümleri'},...['requests','licenses'].map(tab=>el('button',{type:'button','aria-selected':String(state.tab===tab),disabled:state.busy,onClick:()=>{state.tab=tab;state.selected=null;state.detail=null;render();}},tab==='requests'?`Başvurular (${data.requests.length})`:`Lisanslar (${data.licenses.length})`))),
- el('div',{class:'grid'},card(el('h2',{},state.tab==='requests'?'Lisans Başvuruları':'Kurum Lisansları'),el('p',{class:'muted'},'Son 100 kayıt · '+new Intl.DateTimeFormat('tr-TR',{timeStyle:'short'}).format(new Date())),rows.length?table(rows):el('p',{class:'empty'},'Henüz kayıt bulunmuyor.')),
- state.selected?(state.tab==='requests'?requestDetail(state.selected):licenseDetail(state.selected)):card(el('h2',{},'Kayıt Ayrıntısı'),el('p',{class:'empty'},'İncelemek istediğiniz kaydı seçin.'))));}
+ return el('div',{},el('nav',{class:'row tabs','aria-label':'Yönetim bölümleri'},...['requests','licenses','profile_changes'].map(tab=>el('button',{type:'button','aria-selected':String(state.tab===tab),disabled:state.busy,onClick:()=>{state.tab=tab;state.selected=null;state.detail=null;render();}},tab==='requests'?`Başvurular (${data.requests.length})`:tab==='licenses'?`Lisanslar (${data.licenses.length})`:`Profil Talepleri (${(data.profile_changes??[]).length})`))),
+ el('div',{class:'grid'},card(el('h2',{},state.tab==='requests'?'Lisans Başvuruları':state.tab==='licenses'?'Kurum Lisansları':'Profil Değişiklik Talepleri'),el('p',{class:'muted'},'Son 100 kayıt · '+new Intl.DateTimeFormat('tr-TR',{timeStyle:'short'}).format(new Date())),rows.length?(state.tab==='profile_changes'?profileChangeList(rows):table(rows)):el('p',{class:'empty'},'Henüz kayıt bulunmuyor.')),
+ state.selected?(state.tab==='requests'?requestDetail(state.selected):state.tab==='licenses'?licenseDetail(state.selected):profileChangeDetail(state.selected)):card(el('h2',{},'Kayıt Ayrıntısı'),el('p',{class:'empty'},'İncelemek istediğiniz kaydı seçin.'))));}
 function render(){app.replaceChildren(renderHeader(),el('main',{class:'wrap'},preview?el('p',{class:'preview'},'Yerel salt okunur taslak · örnek veriler'):null,state.notice?el('div',{class:'notice'+(state.error?' error':''),role:state.error?'alert':'status'},state.notice):null,
- state.token?renderDashboard():linkToken?renderLink():renderLogin(),el('p',{class:'footer'},'Stok Asist · Kurum verileri cihazda kalır. Bu panel lisans yönetimi içindir.')));}
+ linkToken?renderLink():state.token?renderDashboard():renderLogin(),el('p',{class:'footer'},'Stok Asist · Kurum verileri cihazda kalır. Bu panel lisans yönetimi içindir.')));}
 if(preview){state.token='preview';state.email='Örnek yönetici';state.data={requests:[{id:'sample-request',institution_name:'Örnek Eğitim ve Araştırma Hastanesi',email:'ornek@example.invalid',first_name:'Örnek',last_name:'Kullanıcı',city:'Konya',role_name:'Eczacı',status:'pending',created_at:'2026-11-02T09:00:00Z'}],licenses:[{id:'sample-license',institution_name:'Örnek Devlet Hastanesi',email:'lisans@example.invalid',plan:'pilot',lifecycle:'active',valid_until:'2027-01-31T21:00:00Z',device_limit:2,active_devices:1}]};state.selected=state.data.requests[0];}
 if(preview&&new URL(location.href).searchParams.get('offline')==='1'){
  state.tab='licenses';state.selected=state.data.licenses[0];state.detail={devices:[],emails:[]};
@@ -158,5 +185,10 @@ if(preview&&new URL(location.href).searchParams.get('offline')==='1'){
  installation_id:'ornek-cihaz',device_key_fingerprint:'0'.repeat(64),activation_id:null}};
 }
 
-render();
+if(preview&&new URL(location.href).searchParams.get('profile')==='1'){
+ const original={institution_id:'sample-institution',institution_name:'Örnek Eğitim ve Araştırma Hastanesi',city:'Konya',beds:'0-150',first_name:'Örnek',last_name:'Kullanıcı',role_name:'Eczacı',email:'ornek@example.invalid',version:'b'.repeat(64)};
+ state.data.profile_changes=[{id:'sample-change',license_id:'sample-license',activation_id:'sample-device',created_at:'2026-11-07T09:00:00Z',status:'pending',original,proposed:{...original,city:'Ankara',beds:'151-300'},explanation:'Kurum kaydındaki bilgilerin düzeltilmesini rica ediyoruz.',reason:''}];
+ state.tab='profile_changes';state.selected=state.data.profile_changes[0];
+}
 
+render();
