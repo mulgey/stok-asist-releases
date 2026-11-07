@@ -133,6 +133,13 @@ function licenseDetail(row){const detail=state.detail??{devices:[],emails:[]};re
  button(row.lifecycle==='revoked'?'İptali Geri Al':'Lisansı İptal Et',()=>confirmAction(row.lifecycle==='revoked'?'restore':'revoke',{license_id:row.id},row.lifecycle==='revoked'?'İptali Geri Al':'Lisansı İptal Et',`${row.institution_name} · ${row.active_devices} etkin cihaz. Yeni hesaplama yetkisi, doğrulanmış iptal bilgisini alan cihazlarda durur.`),'danger')),
  el('div',{class:'row'},button('Sorumlu E-postasını Değiştir',()=>{const value=input('email','',{required:true});modal('Sorumlu E-postası',[el('p',{},'Yalnız bu lisansın sorumlu bağı değişir.'),field('Yeni e-posta',value)],'Değişikliği Onayla',()=>operate('change_email',{license_id:row.id,email:value.value}));}),
  button('Başka Kuruma Taşı',()=>{const value=input('text','',{required:true,maxlength:200});modal('Lisansın Kurum Bağını Değiştir',[el('p',{},'Yerel kurum verileri taşınmaz, silinmez veya birleştirilmez.'),field('Yeni kurum adı',value)],'Kurum Değişikliğini Onayla',()=>operate('change_institution',{license_id:row.id,institution_name:value.value}));})),
+ el('div',{class:'row'},button('Kurum Bilgilerini Düzelt',()=>{
+  const name=input('text',row.institution_name,{required:true,maxlength:200});
+  const city=input('text',row.city??'',{maxlength:80});
+  modal('Kurum Adı ve Şehir',[field('Kurum adı',name),field('Şehir',city)],
+   'Düzeltmeyi Onayla',()=>operate('correct_institution',{
+    license_id:row.id,institution_name:name.value,city:city.value}));
+ })),
  offlineSection(row),
  el('h3',{},'Uzatma Talepleri'),el('div',{class:'list'},...(detail.extension_requests??[]).map(ext=>el('div',{class:'mail'},pill(ext.status),el('p',{class:'muted'},fmt(ext.created_at)),ext.status==='pending'?button('Talebi Reddet',()=>{const reason=el('textarea',{required:true,maxlength:2000});modal('Uzatma Talebini Reddet',[field('Kullanıcıya gerekçe',reason)],'Reddi Onayla',()=>operate('reject_extension',{extension_id:ext.id,reason:reason.value}));},'small'):null))),
  el('h3',{},'Cihazlar'),el('div',{class:'list'},...(detail.devices.length?detail.devices.map(d=>el('div',{class:'device stack'},el('strong',{},d.device_name||'Adlandırılmamış cihaz'),el('p',{class:'muted'},d.short_id+' · '+d.os_name+' · '+d.app_version),el('p',{class:'muted'},'Son doğrulama: '+fmt(d.last_checked_at)),el('div',{class:'row'},pill(d.active?'active':'revoked'),d.active?button('Cihazı Pasifleştir',()=>confirmAction('deactivate_device',{activation_id:d.id},'Cihazı Pasifleştir',`${d.device_name||d.short_id}: çevrimdışı cihazın mevcut izni bitene kadar çalışabileceğini unutmayın.`),'small'):null))):[el('p',{class:'muted'},'Etkinleştirilmiş cihaz yok.')])),
@@ -152,3 +159,4 @@ if(preview&&new URL(location.href).searchParams.get('offline')==='1'){
 }
 
 render();
+
