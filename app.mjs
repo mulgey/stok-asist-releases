@@ -16,7 +16,15 @@ function el(tag,attrs={},...children){const node=document.createElement(tag);for
  else if(key==='value')node.value=value;else if(typeof value==='boolean'){if(value)node.setAttribute(key,'');}else node.setAttribute(key,value);
 }for(const child of children.flat(Infinity))if(child!==null&&child!==undefined)node.append(child instanceof Node?child:document.createTextNode(String(child)));return node;}
 const button=(label,fn,cls='')=>el('button',{type:'button',class:cls,disabled:state.busy,onClick:fn},label);
-const pill=value=>el('span',{class:'pill'},labels[value]??value);
+const statusTones=new Map(Object.entries({
+ approved:'success',active:'success',sent:'success',delivered:'success',
+ pending:'warning',needs_info:'warning',pending_email:'warning',needs_review:'warning',expired:'warning',sending:'warning',
+ rejected:'danger',cancelled:'danger',withdrawn:'danger',revoked:'danger',failed:'danger',
+}));
+function pill(value){
+ const tone=statusTones.get(value);
+ return el('span',{class:tone?'pill pill-'+tone:'pill'},labels[value]??value);
+}
 const field=(label,input)=>el('label',{},label,input);
 const fmt=value=>value?new Intl.DateTimeFormat('tr-TR',{dateStyle:'medium',timeStyle:'short',timeZone:'Europe/Istanbul'}).format(new Date(value)):'—';
 const card=(...children)=>el('section',{class:'card stack'},...children);
