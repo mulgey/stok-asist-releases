@@ -301,7 +301,7 @@ function profileChangeDetail(row){
 }
 function profileChangeList(rows){return el('div',{class:'list'},...rows.map(row=>el('div',{class:'device'},
  el('strong',{},row.original.institution_name),el('p',{},row.original.email),el('div',{class:'row profile-list-actions'},pill(row.status),
- button('İncele',()=>{state.selected=row;render();},'small'),archiveButton(row)))));}
+ el('div',{class:'row record-actions'},inspectButton(()=>{state.selected=row;render();}),archiveButton(row))))));}
 async function loadInstallations(){
  if(preview){state.installReleases=[{id:'cccccccc-cccc-4ccc-8ccc-cccccccccccc',version:'Örnek Test Sürümü',filename:'Ornek-Test.exe'}];state.installHistory=[];state.data.installations=[{id:'example-install',name:'Deniz Örnek',institution:'Örnek Eğitim ve Araştırma Hastanesi',email:'ornek@example.invalid',status:['pending','approved','rejected'].includes(new URL(location.href).searchParams.get('install_status'))?new URL(location.href).searchParams.get('install_status'):'pending',created_at:'2026-11-21T10:00:00Z'}];return;}
  state.installReleases=(await request('admin-installations',{action:'catalog'})).releases;
@@ -475,10 +475,10 @@ function renderMailTemplates(){
   el('p',{class:'muted'},'Ürün anahtarı, tarihler, işlem bağlantıları, simgeler ve imza otomatik eklenir.'),form),sample);
 }
 function renderDashboard(){
- const count=tab=>{const size=state.data?.[tab]?.length??0;return size>pageSize?pageSize+'+':size;};
+ const count=tab=>state.data?.pending_counts?.[tab]??(preview?state.data?.[tab]?.filter(row=>row.status==='pending').length??0:0);
  const rows=visibleRows();
  const displayed=rows.slice(0,pageSize);
- const tabs=[['installations','Kurulum Talepleri'],['requests',`Başvurular (${count('requests')})`],['licenses',`Lisanslar (${count('licenses')})`],['profile_changes',`Profil Talepleri (${count('profile_changes')})`],['mail_templates','E-posta Şablonları']];
+ const tabs=[['installations',`Kurulum Talepleri (${count('installations')})`],['requests',`Başvurular (${count('requests')})`],['licenses',`Lisanslar (${count('licenses')})`],['profile_changes',`Profil Talepleri (${count('profile_changes')})`],['mail_templates','E-posta Şablonları']];
  const navigation=el('nav',{class:'row tabs','aria-label':'Yönetim bölümleri'},...tabs.map(([tab,label])=>el('button',{
   type:'button','aria-selected':String(state.tab===tab),disabled:state.busy,onClick:()=>action(async()=>{
    state.tab=tab;

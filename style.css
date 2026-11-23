@@ -26,3 +26,7 @@
 
 .archive-primary{background:#15803d;border-color:#15803d;color:#fff}
 .archive-primary:hover{background:#166534;border-color:#166534}
+
+.installation-table :is(th,td):nth-child(n+2){text-align:center}
+.installation-table .record-actions{justify-content:center}
+.profile-list-actions>.record-actions{margin-inline-start:auto;justify-content:flex-end}
