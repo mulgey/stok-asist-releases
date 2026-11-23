@@ -7,7 +7,7 @@ const fragment=new URLSearchParams(location.hash.slice(1));
 const linkKind=['admin','recover','info','profile'].find(name=>fragment.has(name));
 let linkToken=linkKind?fragment.get(linkKind):null;
 if(location.hash)history.replaceState(null,'',location.pathname+location.search);
-const state={offline:null,token:'',email:'',tab:'requests',selected:null,data:null,recordPage:null,archived:false,offset:0,detail:null,busy:false,notice:'',error:false};
+const state={offline:null,token:'',email:'',tab:'installations',selected:null,data:null,recordPage:null,archived:false,offset:0,detail:null,busy:false,notice:'',error:false};
 const pending=new Map();
 const labels={pending_email:'E-posta doğrulaması bekliyor',withdrawn:'Geri çekildi',needs_review:'Yeniden değerlendirme gerekli',pending:'Bekliyor',approved:'Onaylandı',rejected:'Reddedildi',needs_info:'Ek bilgi bekleniyor',cancelled:'İptal',active:'Aktif',expired:'Süresi doldu',revoked:'İptal edildi',sent:'Gönderildi',delivered:'Teslim edildi',failed:'Gönderilemedi',sending:'Gönderiliyor',pilot:'Ücretsiz Pilot',paid:'Ücretli',sponsored:'Sponsorlu'};
 const statusTones=new Map(Object.entries({
@@ -95,7 +95,6 @@ function headerButton(label,icon,callback,cls){
    'M7.5 13.5 10 11', 'M10.5 16.5 13 14',
    'm12 6 6 6 2.3-2.3a2.4 2.4 0 0 0 0-3.4l-2.6-2.6a2.4 2.4 0 0 0-3.4 0Z',
   ],
-  refresh:['M3 10a9 9 0 0 1 15-6l3 3','M21 3v4h-4','M21 14a9 9 0 0 1-15 6l-3-3','M3 21v-4h4'],
   'archive-arrow-up':['M3 5h18v4H3z','M5 9v11h14V9','M12 17v-5','m9 15 3-3 3 3'],
   search:['M21 21l-4.34-4.34','M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z'],
   'refresh-cw':['M3 10a9 9 0 0 1 15-6l3 3','M21 3v4h-4','M21 14a9 9 0 0 1-15 6l-3-3','M3 21v-4h4'],
@@ -405,7 +404,7 @@ function renderInstallations(){
  const rows=visibleRows();
  const selected=state.selected;
  return el('div',{class:'grid'},card(el('h2',{},'Kurulum Talepleri'),el('p',{class:'muted'},'Kurulum erişimi talepleri lisans başvurularından ayrıdır.'),
- headerButton('Listeyi Yenile','refresh',()=>action(refresh),'small primary'),recordFilters(),
+ recordFilters(),
  rows.length?el('div',{class:'scroll',tabindex:'0','aria-label':'Kurulum kayıtları'},
   el('table',{class:'installation-table'},
    el('thead',{},el('tr',{},...['Kurum / Başvuran','Durum','Başvuru','İşlem'].map(t=>el('th',{},t)))),
@@ -499,7 +498,7 @@ function renderDashboard(){
 }
 function render(){app.replaceChildren(renderHeader(),el('main',{class:'wrap'},preview?el('p',{class:'preview'},'Yerel salt okunur taslak · örnek veriler'):null,state.notice?el('div',{class:'notice'+(state.error?' error':''),role:state.error?'alert':'status'},state.notice):null,
  linkToken?renderLink():state.token?renderDashboard():renderLogin(),el('p',{class:'footer'},'Stok Asist · Kurum verileri cihazda kalır. Bu panel lisans yönetimi içindir.')));}
-if(preview){state.token='preview';state.email='Örnek yönetici';state.data={requests:[{id:'sample-request',institution_name:'Örnek Eğitim ve Araştırma Hastanesi',email:'ornek@example.invalid',first_name:'Örnek',last_name:'Kullanıcı',city:'Konya',role_name:'Eczacı',status:'pending',created_at:'2026-11-02T09:00:00Z'}],licenses:[{id:'sample-license',institution_name:'Örnek Devlet Hastanesi',email:'lisans@example.invalid',plan:'pilot',lifecycle:'active',valid_until:'2027-01-31T21:00:00Z',device_limit:2,active_devices:1}]};state.selected=state.data.requests[0];}
+if(preview){state.token='preview';state.email='Örnek yönetici';state.data={requests:[{id:'sample-request',institution_name:'Örnek Eğitim ve Araştırma Hastanesi',email:'ornek@example.invalid',first_name:'Örnek',last_name:'Kullanıcı',city:'Konya',role_name:'Eczacı',status:'pending',created_at:'2026-11-02T09:00:00Z'}],licenses:[{id:'sample-license',institution_name:'Örnek Devlet Hastanesi',email:'lisans@example.invalid',plan:'pilot',lifecycle:'active',valid_until:'2027-01-31T21:00:00Z',device_limit:2,active_devices:1}]};}
 if(preview&&new URL(location.href).searchParams.get('offline')==='1'){
  state.tab='licenses';state.selected=state.data.licenses[0];state.detail={devices:[],emails:[]};
  state.offline={licenseId:state.selected.id,raw:'',response:null,preview:{operation:'activate',request_id:'ornek-talep',
@@ -512,4 +511,5 @@ if(preview&&new URL(location.href).searchParams.get('profile')==='1'){
  state.tab='profile_changes';state.selected=state.data.profile_changes[0];
 }
 
+if(preview&&state.tab==='installations')await loadInstallations();
 render();
