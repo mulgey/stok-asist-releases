@@ -96,6 +96,7 @@ function headerButton(label,icon,callback,cls){
    'm12 6 6 6 2.3-2.3a2.4 2.4 0 0 0 0-3.4l-2.6-2.6a2.4 2.4 0 0 0-3.4 0Z',
   ],
   refresh:['M3 10a9 9 0 0 1 15-6l3 3','M21 3v4h-4','M21 14a9 9 0 0 1-15 6l-3-3','M3 21v-4h4'],
+  'archive-arrow-up':['M3 5h18v4H3z','M5 9v11h14V9','M12 17v-5','m9 15 3-3 3 3'],
   search:['M21 21l-4.34-4.34','M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z'],
   'refresh-cw':['M3 10a9 9 0 0 1 15-6l3 3','M21 3v4h-4','M21 14a9 9 0 0 1-15 6l-3-3','M3 21v-4h4'],
   'log-out':['M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4','M16 17l5-5-5-5','M21 12H9']
@@ -124,7 +125,7 @@ function archiveButton(row){
  const archive=!state.archived;
  const label=archive?'Arşivle':'Arşivden Çıkar';
  const name=row.institution_name??row.institution??row.original?.institution_name??row.name??row.email;
- return button(label,()=>modal(label,[
+ const confirm=()=>modal(label,[
   el('p',{},el('strong',{},name),el('br'),row.email??row.original?.email),
   el('p',{class:'muted'},archive?'Kayıt ana listeden Arşivlenenler görünümüne taşınır. Lisanslar, indirme bağlantıları ve işlem geçmişi korunur.':'Kayıt ana listede yeniden görünür.'),
  ],label,async()=>{
@@ -134,7 +135,9 @@ function archiveButton(row){
   state.notice=archive?'Kayıt arşivlendi.':'Kayıt arşivden çıkarıldı.';
   state.error=false;
   await refresh();
- }),'small archive-button');
+ });
+ return archive?headerButton(label,'archive-arrow-up',confirm,'small archive-button archive-primary'):
+  button(label,confirm,'small archive-button');
 }
 function recordFilters(){
  if(preview)return null;

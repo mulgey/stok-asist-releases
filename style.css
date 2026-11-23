@@ -23,3 +23,6 @@
 .record-actions{gap:6px}
 .archive-button{white-space:nowrap}
 .record-filters button[aria-pressed=true]{background:#e8f0ff;border-color:#a8c4f4;color:#184384}
+
+.archive-primary{background:#15803d;border-color:#15803d;color:#fff}
+.archive-primary:hover{background:#166534;border-color:#166534}
