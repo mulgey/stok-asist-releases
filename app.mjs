@@ -91,6 +91,7 @@ async function showRecords(archived,offset){
  closeRecord();
 }
 async function refresh(){
+ if(state.tab==='installations'&&state.retention){await loadRetention(state.retention.offset);return;}
  if(state.tab==='mail_templates'){await loadMailTemplates();render();return;}
  if(preview){if(state.tab==='installations')await loadInstallations();render();return;}
  state.data=await request('admin-records',{action:'list',archived:false,page_offset:0});
@@ -151,7 +152,7 @@ function headerButton(label,icon,callback,cls){
 }
 const inspectButton=onClick=>headerButton('İncele','search',onClick,'small primary inspect-button');
 function renderHeader(){return el('header',{class:'top'},el('div',{class:'brand'},el('div',{class:'logo'},'S'),el('div',{},el('h1',{},'Stok Asist'),el('p',{class:'muted'},'Lisans Yönetimi')),el('span',{class:'tag'},'Üretim')),
- state.token?el('div',{class:'row'},el('span',{class:'muted'},state.email||'Yönetici'),headerButton('Hizmet Kontrolü','unplug',()=>action(checkHealth),'primary'),headerButton('Yenile','refresh-cw',()=>action(refresh),'primary'),headerButton('Çıkış Yap','log-out',()=>action(async()=>{if(!preview)await request('admin-logout',{});state.token='';state.data=null;await showRecords(false,0);state.notice='Oturum kapatıldı.';}),'header-danger')):null);}
+ state.token?el('div',{class:'row'},el('span',{class:'muted'},state.email||'Yönetici'),headerButton('Hizmet Kontrolü','unplug',()=>action(checkHealth),'primary'),headerButton('Yenile','refresh-cw',()=>action(refresh),'primary'),headerButton('Çıkış Yap','log-out',()=>action(async()=>{if(!preview)await request('admin-logout',{});state.token='';state.data=null;state.retention=null;await showRecords(false,0);state.notice='Oturum kapatıldı.';}),'header-danger')):null);}
 function renderLogin(){const address=input('email','',{required:true,autocomplete:'email',placeholder:'Yönetici e-posta adresiniz'});
  const form=el('form',{class:'stack'},el('h2',{},'Yönetici Girişi'),el('p',{class:'muted'},'İzin verilen adresinize tek kullanımlık giriş bağlantısı gönderilir.'),field('E-posta adresi',address),el('button',{type:'submit',class:'primary',disabled:state.busy},'Giriş Bağlantısı Gönder'));
  form.addEventListener('submit',event=>{event.preventDefault();action(async()=>{await request('admin-login',{email:address.value});state.notice='Adresiniz yetkiliyse giriş bağlantısı e-postanıza gönderilir. Gelen kutunuzu ve istenmeyen postayı kontrol edin.';state.error=false;});});return el('div',{class:'login'},card(form,el('p',{class:'muted'},'Bu panel kurumun stok veya rapor içeriklerini görüntülemez.')));}
@@ -448,7 +449,10 @@ function renderInstallations(){
  const rows=visibleRows();
  const selected=state.selected;
  return dashboardGrid(card(el('h2',{},'Kurulum Talepleri'),el('p',{class:'muted'},'Kurulum erişimi talepleri lisans başvurularından ayrıdır.'),
- recordFilters(),
+ el('div',{class:'row'},recordFilters(),preview?null:button('İmha İncelemesi',()=>action(async()=>{
+  await loadRetention(0);
+  closeRecord();
+ }),'small')),
  rows.length?el('div',{class:'scroll',tabindex:'0','aria-label':'Kurulum kayıtları'},
   el('table',{class:'installation-table'},
    el('thead',{},el('tr',{},...['Kurum / Başvuran','Durum','Başvuru','İşlem'].map(t=>el('th',{},t)))),
@@ -464,6 +468,39 @@ function renderInstallations(){
   button('Ek Bilgi İste',()=>reviewInstallationDecision(selected,'needs_info')),
   button('Talebi Reddet',()=>reviewInstallationDecision(selected,'reject'),'danger')):null,
  installationDeliveryControls(),installationEmailHistory()):card(el('h2',{},'Talep Ayrıntısı'),el('p',{class:'empty'},'İncelemek istediğiniz kurulum talebini seçin.')));
+}
+async function loadRetention(offset){
+ const {candidates}=await request('admin-install-retention',{action:'list',page_offset:offset});
+ state.retention={candidates,offset};
+}
+function confirmRetentionDelete(row){
+ const confirmation=input('checkbox','',{required:true});
+ modal('Kurulum Kaydını Kalıcı Sil',[
+  el('p',{},el('strong',{},row.name+' · '+row.institution),el('br'),row.email),
+  el('p',{},'Başvuru ve bağlı sunucu kayıtları kalıcı olarak silinir. Posta kutusu, e-posta sağlayıcısı ve yedek kopyaları ayrı değerlendirilir.'),
+  el('label',{class:'retention-confirmation'},confirmation,'Kaydı inceledim ve saklanmasını gerektiren açık bir durum bulunmadığını doğruladım.'),
+ ],'Kalıcı Sil',async()=>{
+  await request('admin-install-retention',{action:'delete',request_id:row.id,confirmed:confirmation.checked});
+  state.notice='Kurulum kaydı sunucudan silindi.';
+  state.error=false;
+  await loadRetention(0);
+ });
+}
+function renderRetention(){
+ const {candidates,offset}=state.retention;
+ return card(el('h2',{},'İmha İncelemesi'),
+  el('div',{class:'row'},button('Kurulum Taleplerine Dön',()=>action(async()=>{
+   state.retention=null;
+   await refresh();
+  }),'small')),
+  el('p',{class:'muted'},'Kapanışından 90 gün geçmiş ve süresi dolmamış indirme bağlantısı bulunmayan kayıtlar.'),
+  candidates.length?el('div',{class:'list'},...candidates.slice(0,pageSize).map(row=>el('div',{class:'device stack'},
+   el('div',{},el('strong',{},row.institution),el('p',{},row.name),el('p',{class:'muted'},row.email)),
+   el('div',{class:'row'},pill(row.status),el('span',{class:'muted'},'Kapanış '+fmt(row.closed_at)),
+    button('Kalıcı Sil',()=>confirmRetentionDelete(row),'small header-danger'))))):el('p',{class:'empty'},'İmha incelemesine uygun kayıt bulunmuyor.'),
+  el('div',{class:'row'},
+   offset?button('Önceki Sayfa',()=>action(()=>loadRetention(offset-pageSize)),'small'):null,
+   candidates.length>pageSize?button('Sonraki Sayfa',()=>action(()=>loadRetention(offset+pageSize)),'small'):null));
 }
 function selectMailTemplate(kind){
  const template=state.mailTemplates?.find(item=>item.kind===kind);
@@ -525,12 +562,14 @@ function renderDashboard(){
  const navigation=el('nav',{class:'row tabs','aria-label':'Yönetim bölümleri'},...tabs.map(([tab,label])=>el('button',{
   type:'button','aria-selected':String(state.tab===tab),disabled:state.busy,onClick:()=>action(async()=>{
    state.tab=tab;
+   state.retention=null;
    await showRecords(false,0);
    if(tab==='installations')await loadInstallations();
    if(tab==='mail_templates')await loadMailTemplates();
   }),
  },label)));
- if(state.tab==='installations')return el('div',{class:'dashboard'},navigation,renderInstallations());
+ if(state.tab==='installations')return el('div',{class:'dashboard'},navigation,state.retention?
+  dashboardGrid(renderRetention()):renderInstallations());
  if(state.tab==='mail_templates')return el('div',{class:'dashboard'},navigation,renderMailTemplates());
  const title=state.tab==='requests'?'Lisans Başvuruları':state.tab==='licenses'?'Kurum Lisansları':'Profil Değişiklik Talepleri';
  return el('div',{class:'dashboard'},navigation,dashboardGrid(
@@ -547,7 +586,7 @@ function render(){
  const content=linkToken?renderLink():dashboard?renderDashboard():renderLogin();
  if(dashboard){
   const panels=content.querySelectorAll('.grid > .card');
-  const listKey=JSON.stringify([state.tab,state.archived,state.offset]);
+  const listKey=JSON.stringify([state.tab,state.archived,state.offset,state.retention?.offset]);
   const detailKey=state.selected?.id??state.mailDraft?.kind??'';
   content.dataset.listKey=listKey;
   content.dataset.detailKey=detailKey;

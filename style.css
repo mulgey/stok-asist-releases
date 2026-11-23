@@ -51,3 +51,7 @@
 .toast-close{flex:none;padding:0 6px;border:0;background:transparent;color:inherit;font-size:18px;line-height:1.2}
 @keyframes toast-enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.toast{animation:none}}
+
+.dashboard > .grid > .card:only-child{grid-column:1/-1}
+.retention-confirmation{grid-template-columns:auto 1fr;align-items:start;gap:9px}
+.retention-confirmation input{width:auto;margin-top:4px}
