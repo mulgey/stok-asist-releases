@@ -28,8 +28,52 @@ function pill(value,extraClass=''){
 const field=(label,input)=>el('label',{},label,input);
 const fmt=value=>value?new Intl.DateTimeFormat('tr-TR',{dateStyle:'medium',timeStyle:'short',timeZone:'Europe/Istanbul'}).format(new Date(value)):'—';
 const card=(...children)=>el('section',{class:'card stack'},...children);
+function dashboardGrid(...cards){
+ for(const panel of cards){
+  panel.tabIndex=0;
+  panel.setAttribute('aria-label',panel.firstElementChild.textContent);
+ }
+ return el('div',{class:'grid'},...cards);
+}
 const input=(type='text',value='',attrs={})=>el('input',{type,value,...attrs});
 function notice(text,error=false){state.notice=text;state.error=error;render();}
+const toastHost=el('div',{class:'toast-host'});
+const toastStatus=el('div',{role:'status','aria-atomic':'true'});
+const toastAlert=el('div',{role:'alert','aria-atomic':'true'});
+toastHost.append(toastStatus,toastAlert);
+document.body.append(toastHost);
+let toastTimer;
+let displayedNotice='';
+let displayedError=false;
+
+function dismissToast(){
+ clearTimeout(toastTimer);
+ state.notice='';
+ state.error=false;
+ renderToast();
+}
+function scheduleToastDismissal(){
+ clearTimeout(toastTimer);
+ toastTimer=setTimeout(dismissToast,displayedError?9000:5000);
+}
+function renderToast(){
+ if(state.notice===displayedNotice&&state.error===displayedError)return;
+ clearTimeout(toastTimer);
+ displayedNotice=state.notice;
+ displayedError=state.error;
+ toastStatus.replaceChildren();
+ toastAlert.replaceChildren();
+ if(!displayedNotice)return;
+
+ const message=el('div',{class:displayedError?'toast toast-error':'toast'},el('span',{},displayedNotice),
+  el('button',{type:'button',class:'toast-close','aria-label':'Bildirimi kapat',onClick:dismissToast},'×'));
+ message.addEventListener('pointerenter',()=>clearTimeout(toastTimer));
+ message.addEventListener('pointerleave',()=>{if(!message.contains(document.activeElement))scheduleToastDismissal();});
+ message.addEventListener('focusin',()=>clearTimeout(toastTimer));
+ message.addEventListener('focusout',()=>{if(!message.matches(':hover'))scheduleToastDismissal();});
+ (displayedError?toastAlert:toastStatus).append(message);
+ scheduleToastDismissal();
+}
 async function request(route,data){if(preview)throw Error('Salt okunur önizleme sunucuya bağlanmaz.');const headers={'Content-Type':'application/json'};if(state.token)headers.Authorization='Bearer '+state.token;
  const response=await fetch(API+'/'+route,{method:data===undefined?'GET':'POST',headers,...(data===undefined?{}:{body:JSON.stringify(data)}),signal:AbortSignal.timeout(20000)});
  const value=await response.json();if(!response.ok){if(response.status===401&&state.token){state.token='';state.data=null;state.offline=null;}throw Error(errors[value.error]??'İşlem tamamlanamadı.');}return value;}
@@ -403,7 +447,7 @@ const installationPill=status=>pill(status,'install-state');
 function renderInstallations(){
  const rows=visibleRows();
  const selected=state.selected;
- return el('div',{class:'grid'},card(el('h2',{},'Kurulum Talepleri'),el('p',{class:'muted'},'Kurulum erişimi talepleri lisans başvurularından ayrıdır.'),
+ return dashboardGrid(card(el('h2',{},'Kurulum Talepleri'),el('p',{class:'muted'},'Kurulum erişimi talepleri lisans başvurularından ayrıdır.'),
  recordFilters(),
  rows.length?el('div',{class:'scroll',tabindex:'0','aria-label':'Kurulum kayıtları'},
   el('table',{class:'installation-table'},
@@ -469,7 +513,7 @@ function renderMailTemplates(){
   el('div',{class:'row'},button('E-postayı Önizle',()=>{if(form.reportValidity())action(()=>send(false));}),
    el('button',{class:'primary',type:'submit',disabled:state.busy},'Şablonu Kaydet')));
  form.addEventListener('submit',event=>{event.preventDefault();action(()=>send(true));});
- return el('div',{class:'grid'},card(el('h2',{},'E-posta Şablonları'),field('Şablon',selector),
+ return dashboardGrid(card(el('h2',{},'E-posta Şablonları'),field('Şablon',selector),
   el('p',{class:'muted'},draft.revision?'Sürüm '+draft.revision:'Varsayılan metin'),
   el('p',{class:'muted'},'Ürün anahtarı, tarihler, işlem bağlantıları, simgeler ve imza otomatik eklenir.'),form),sample);
 }
@@ -486,18 +530,40 @@ function renderDashboard(){
    if(tab==='mail_templates')await loadMailTemplates();
   }),
  },label)));
- if(state.tab==='installations')return el('div',{},navigation,renderInstallations());
- if(state.tab==='mail_templates')return el('div',{},navigation,renderMailTemplates());
+ if(state.tab==='installations')return el('div',{class:'dashboard'},navigation,renderInstallations());
+ if(state.tab==='mail_templates')return el('div',{class:'dashboard'},navigation,renderMailTemplates());
  const title=state.tab==='requests'?'Lisans Başvuruları':state.tab==='licenses'?'Kurum Lisansları':'Profil Değişiklik Talepleri';
- return el('div',{},navigation,el('div',{class:'grid'},
+ return el('div',{class:'dashboard'},navigation,dashboardGrid(
   card(el('h2',{},title),el('p',{class:'muted'},new Intl.DateTimeFormat('tr-TR',{timeStyle:'short',timeZone:'Europe/Istanbul'}).format(new Date())),
    recordFilters(),displayed.length?
    (state.tab==='profile_changes'?profileChangeList(displayed):table(displayed)):emptyRecords('Henüz kayıt bulunmuyor.'),recordPagination(rows)),
   state.selected?(state.tab==='requests'?requestDetail(state.selected):state.tab==='licenses'?licenseDetail(state.selected):profileChangeDetail(state.selected)):
    card(el('h2',{},'Kayıt Ayrıntısı'),el('p',{class:'empty'},'İncelemek istediğiniz kaydı seçin.'))));
 }
-function render(){app.replaceChildren(renderHeader(),el('main',{class:'wrap'},preview?el('p',{class:'preview'},'Yerel salt okunur taslak · örnek veriler'):null,state.notice?el('div',{class:'notice'+(state.error?' error':''),role:state.error?'alert':'status'},state.notice):null,
- linkToken?renderLink():state.token?renderDashboard():renderLogin(),el('p',{class:'footer'},'Stok Asist · Kurum verileri cihazda kalır. Bu panel lisans yönetimi içindir.')));}
+function render(){
+ const dashboard=Boolean(state.token&&!linkToken);
+ const previous=app.querySelector('.dashboard');
+ const scroll=[...(previous?.querySelectorAll('.grid > .card')??[])].map(panel=>panel.scrollTop);
+ const content=linkToken?renderLink():dashboard?renderDashboard():renderLogin();
+ if(dashboard){
+  const panels=content.querySelectorAll('.grid > .card');
+  const listKey=JSON.stringify([state.tab,state.archived,state.offset]);
+  const detailKey=state.selected?.id??state.mailDraft?.kind??'';
+  content.dataset.listKey=listKey;
+  content.dataset.detailKey=detailKey;
+  app.replaceChildren(renderHeader(),renderMain(content,dashboard));
+  if(previous?.dataset.listKey===listKey){
+   if(panels[0])panels[0].scrollTop=scroll[0]??0;
+   if(panels[1]&&previous.dataset.detailKey===detailKey)panels[1].scrollTop=scroll[1]??0;
+  }
+ }else app.replaceChildren(renderHeader(),renderMain(content,dashboard));
+ renderToast();
+}
+function renderMain(content,dashboard){
+ return el('main',{class:dashboard?'wrap dashboard-wrap':'wrap'},
+  preview?el('p',{class:'preview'},'Yerel salt okunur taslak · örnek veriler'):null,
+  content,el('p',{class:'footer'},'Stok Asist · Kurum verileri cihazda kalır. Bu panel lisans yönetimi içindir.'));
+}
 if(preview){state.token='preview';state.email='Örnek yönetici';state.data={requests:[{id:'sample-request',institution_name:'Örnek Eğitim ve Araştırma Hastanesi',email:'ornek@example.invalid',first_name:'Örnek',last_name:'Kullanıcı',city:'Konya',role_name:'Eczacı',status:'pending',created_at:'2026-11-02T09:00:00Z'}],licenses:[{id:'sample-license',institution_name:'Örnek Devlet Hastanesi',email:'lisans@example.invalid',plan:'pilot',lifecycle:'active',valid_until:'2027-01-31T21:00:00Z',device_limit:2,active_devices:1}]};}
 if(preview&&new URL(location.href).searchParams.get('offline')==='1'){
  state.tab='licenses';state.selected=state.data.licenses[0];state.detail={devices:[],emails:[]};

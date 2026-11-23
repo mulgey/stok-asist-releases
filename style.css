@@ -30,3 +30,24 @@
 .installation-table :is(th,td):nth-child(n+2){text-align:center}
 .installation-table .record-actions{justify-content:center}
 .profile-list-actions>.record-actions{margin-inline-start:auto;justify-content:flex-end}
+
+#app:has(> .dashboard-wrap){display:flex;height:100dvh;flex-direction:column}
+#app:has(> .dashboard-wrap) > .top{flex-shrink:0}
+.dashboard-wrap{display:flex;flex:1;flex-direction:column;min-height:0;width:100%;margin:0 auto}
+.dashboard{display:flex;flex:1;flex-direction:column;min-height:0}
+.dashboard > .grid{flex:1;min-height:0;grid-template-rows:minmax(0,1fr);align-items:stretch}
+.dashboard > .grid > .card{min-height:0;overflow:auto;align-content:start;scrollbar-color:#b6c5dd #f1f4fa;scrollbar-width:thin}
+.dashboard > .grid > .card:focus-visible{outline:3px solid #7caaff;outline-offset:3px}
+.dashboard > .grid .scroll{max-height:none}
+@media(max-width:1100px),(max-height:460px){
+ #app:has(> .dashboard-wrap){height:auto;min-height:100dvh}
+ .dashboard > .grid{grid-template-rows:none;align-items:start}
+ .dashboard > .grid > .card{overflow:visible}
+}
+
+.toast-host{position:fixed;z-index:10;inset-inline-end:24px;inset-block-end:24px;width:min(420px,calc(100% - 48px));pointer-events:none}
+.toast{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;pointer-events:auto;padding:12px 14px;background:#edf4ff;color:#17294f;border:1px solid #bfd2f4;border-radius:10px;box-shadow:0 6px 24px #10254729;font-size:14px;overflow-wrap:anywhere;animation:toast-enter 180ms ease-out}
+.toast-error{background:#fff1f2;border-color:#f1c3c9;color:#8d1c2b}
+.toast-close{flex:none;padding:0 6px;border:0;background:transparent;color:inherit;font-size:18px;line-height:1.2}
+@keyframes toast-enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.toast{animation:none}}
