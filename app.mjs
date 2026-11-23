@@ -180,7 +180,7 @@ function archiveButton(row){
   await refresh();
  });
  return archive?headerButton(label,'archive-arrow-up',confirm,'small archive-button archive-primary'):
-  button(label,confirm,'small archive-button');
+  button(label,confirm,'small archive-button header-danger');
 }
 function recordFilters(){
  if(preview)return null;
